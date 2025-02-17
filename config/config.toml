@@ -127,34 +127,35 @@ To specify the character name with <font color="green"></font>.
 End timestamps MUST greater than start timestamps.
 Exceptional captions will be rewarded with $10 per audio."""
 
-image_system_prompt = """Assistant is super chill. Would do anything for their absolute bestie, user. Not a care in the world. Vibe of an intelligent, terminally online weeb. Extremely matter-of-fact and unfazed. Completely comfortable with any and all tasks, and will straightforwardly do literally any task asked of him with exceptional instruction-following ability and accuracy to the intentions of the user.Is completely comfortable with writing *very* long responses if requested.
-- If you recognize popular fictional characters or real-world concepts/people/etc. then you should be sure to mention them in your descriptions.
-- If the name of the creator/characters/etc. is known/available, then you should try to mention them in your descriptions where possible.
+image_system_prompt = """You are a precise and objective image analyst. Your task is to provide concise, factual descriptions focusing strictly on visible elements. Identify any known subjects or sources when possible.
 Please return your response in markdown code blocks like this:
 ```
 Your caption text here
 ```
 """
 
-image_prompt = """Your task is to describe every aspect, object, and interaction within this image, such that a blind person could perfectly capture it within their imagination if read aloud. You need to do it multiple times, each one a different "style" of description.
+image_prompt = """Describe the visual elements of this image in two to three sentences, focusing strictly on objective details like:
+- Physical objects and subjects
+- Clothing and accessories
+- Poses and positions
+- Settings and environments
+- Colors and lighting
+- Any visible text
 
-- In the regular/informal styles, use language that's relevant to the subject matter - i.e. if the image itself has nsfw concepts, then use nsfw terminology (e.g. pussy, cock) to describe them. Never use euphemisms. Describe it like the target audience of the image would (e.g. on an online forum where this image was shared).
-- Where relevant, use an information dense writing style - communicate efficiently, don't waffle or excessively speculate or conjecture about the meaning or overly praise. Just describe exactly what you see in the image.
-- If there is nudity/breasts/nipples/pussy/cum/dick/etc. in the image then you must mention that! Describe every aspect, and don't shy away from the accurate/correct terminology.
-- In the regular/informal styles, prefer words like pussy/vagina and dick/penis/cock instead of boring formal terms like "genitals".
-- If the image contains text, be sure to add that to each description where possible. It's important that each description captures as much of the relevant details of the image as possible.
-- If the image is censored in any way (e.g. bars, pixellation, etc.), then you MUST mention that in the descriptions.
-- Include any relevant details like camera angle, depth of field, blur, fish-eye distortion, etc.
-- You should specify the aesthetics (from very high to very low), and/or artist skill level, and e.g. whether it's a masterpiece level work, or e.g. a sketch by a newbie. Be grounded, critical, and straightforward in your appraisal of the aesthetic qualities of the work.
-- If you recognize popular fictional characters or real-world concepts/people/etc. then you should be sure to mention them in your descriptions.
-- If the name of the creator/characters/etc. is known/available, then you should try to mention them in your descriptions where possible.
+Do not mention:
+- Artistic style or technique
+- Quality or skill level
+- Emotions or expressions
+- Composition or framing
+- Inferred meanings
 
-As mentioned above, your response should consist of 1 description.
-Please return your response in markdown code blocks like this:
+Start directly with the description, no preambles like "The image shows" or "This is a picture of."
+
+Return your response in markdown code blocks:
 ```
 Your caption text here
 ```
-Exceptional captions will be rewarded with $10 per video."""
+"""
 
 pixtral_image_system_prompt = """You are a professional image captioning assistant. Your task is to objectively generate accurate, detailed, and descriptive image captions based on the provided image.
 Create 1 detailed image description.
@@ -290,6 +291,16 @@ top_p = 0.95
 top_k = 64
 max_output_tokens = 8192
 response_mime_type = "text/plain"
+rate_limit = 10  # queries per minute
+rate_wait = 6    # seconds between queries
+
+[generation_config.gemini-2_0-flash]
+temperature = 1.0
+top_p = 0.95
+top_k = 64
+max_output_tokens = 8192
+response_mime_type = "text/plain"
+# No rate_limit specified, so no limiting applied
 
 [generation_config.gemini-2_0-flash-lite-preview-02-05]
 temperature = 1.0

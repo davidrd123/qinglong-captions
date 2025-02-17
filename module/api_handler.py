@@ -15,9 +15,30 @@ from rich.layout import Layout
 from PIL import Image
 from pathlib import Path
 import re
+from datetime import datetime
 
 console = Console()
 
+# Add at top of file with other globals
+api_call_log = []
+
+def log_api_call(model: str, status: str, elapsed: float, error: str = None):
+    """Log API call details"""
+    timestamp = datetime.now()
+    api_call_log.append({
+        'timestamp': timestamp,
+        'model': model,
+        'status': status,
+        'elapsed': elapsed,
+        'error': error
+    })
+    # Print immediate feedback
+    console.print(f"[blue]{timestamp.strftime('%H:%M:%S.%f')[:-3]}[/blue] API call to [green]{model}[/green]: {status} ({elapsed:.2f}s){' - ' + error if error else ''}")
+    
+    # Show rolling window stats
+    window_start = timestamp.timestamp() - 60
+    window_calls = sum(1 for call in api_call_log if call['timestamp'].timestamp() > window_start)
+    console.print(f"[yellow]Calls in last 60s: {window_calls}[/yellow]")
 
 def api_process_batch(
     uri: str,
@@ -467,6 +488,12 @@ def api_process_batch(
             else config["generation_config"]["default"]
         )
 
+        # Check if rate limiting is needed
+        if "rate_limit" in generation_config:
+            rate_wait = generation_config.get("rate_wait", 6)  # default 6 seconds
+            console.print(f"[yellow]Rate limiting: waiting {rate_wait} seconds...[/yellow]")
+            time.sleep(rate_wait)
+
         genai_config = types.GenerateContentConfig(
             system_instruction=system_prompt,
             temperature=generation_config["temperature"],
@@ -632,6 +659,16 @@ def api_process_batch(
                 response_text = "".join(chunks)
 
                 elapsed_time = time.time() - start_time
+                log_api_call(args.gemini_model_path, "success", elapsed_time)
+                
+                 # Rate limit wait if configured
+                if "rate_limit" in generation_config:
+                    rate_wait = generation_config.get("rate_wait", 6)
+                    remaining = rate_wait - elapsed_time
+                    if remaining > 0:
+                        console.print(f"[yellow]Waiting {remaining:.1f}s...[/yellow]")
+                        time.sleep(remaining)
+                
                 console.print(
                     f"[blue]Caption generation took:[/blue] {elapsed_time:.2f} seconds"
                 )
@@ -684,6 +721,8 @@ def api_process_batch(
 
                 return content
             except Exception as e:
+                elapsed_time = time.time() - start_time
+                log_api_call(args.gemini_model_path, "error", elapsed_time, str(e))
                 error_msg = Text(str(e), style="red")
                 console.print(f"[red]Error processing: {error_msg}[/red]")
                 if attempt < args.max_retries - 1:

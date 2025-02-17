@@ -56,6 +56,9 @@ def process_batch(args, config):
             ):
 
                 if mime.startswith("image") or 0 < duration <= args.segment_time * 1000:
+                    console.print(f"[yellow]Attempting API call for:[/yellow] {filepath}")
+                    console.print(f"[yellow]Using API keys - Gemini:[/yellow] {'Present' if args.gemini_api_key else 'Missing'}")
+                    console.print(f"[yellow]Using API keys - Pixtral:[/yellow] {'Present' if args.pixtral_api_key else 'Missing'}")
 
                     output = api_process_batch(
                         uri=filepath,
@@ -64,6 +67,7 @@ def process_batch(args, config):
                         args=args,
                         sha256hash=sha256hash,
                     )
+                    console.print(f"[yellow]API Response:[/yellow] {output if output else 'No response'}")
 
                     output = _postprocess_caption_content(
                         output, filepath, mode=args.mode
