@@ -17,7 +17,7 @@ else
 fi
 
 # Configuration variables
-dataset_path="./datasets/Marco_Screenshots_pro"  # Default path
+dataset_path="./datasets/hidari_24fps"  # Default path
 if [ $# -gt 0 ]; then
     dataset_path="$1"  # Override with command-line argument if provided
     echo "Using provided dataset path: $dataset_path"

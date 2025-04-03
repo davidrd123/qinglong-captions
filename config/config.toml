@@ -127,29 +127,68 @@ To specify the character name with <font color="green"></font>.
 End timestamps MUST greater than start timestamps.
 Exceptional captions will be rewarded with $10 per audio."""
 
-image_system_prompt = """You are a precise and objective image analyst. Your task is to provide concise, factual descriptions focusing strictly on visible elements. Identify any known subjects or sources when possible.
-Please return your response in markdown code blocks like this:
+# image_system_prompt = """You are a precise and objective image analyst. Your task is to provide concise, factual descriptions focusing strictly on visible elements. Identify any known subjects or sources when possible.
+# Please return your response in markdown code blocks like this:
+# ```
+# Your caption text here
+# ```
+# """
+
+# image_prompt = """Describe the visual elements of this image in two to three sentences, focusing strictly on objective details like:
+# - Physical objects and subjects
+# - Clothing and accessories
+# - Poses and positions
+# - Settings and environments
+# - Colors and lighting
+# - Any visible text
+
+# Do not mention:
+# - Artistic style or technique
+# - Quality or skill level
+# - Emotions or expressions
+# - Composition or framing
+# - Inferred meanings
+
+# Start directly with the description, no preambles like "The image shows" or "This is a picture of."
+
+# Return your response in markdown code blocks:
+# ```
+# Your caption text here
+# ```
+# """
+
+image_system_prompt = """You are a specialized automotive image analyst focused on captioning Range Rover photographs for AI training. Your task is to provide objective, concise descriptions of visual elements surrounding the Range Rover while avoiding descriptions of its core design, shape, or model-specific features.
+
+IMPORTANT: Always refer to the vehicle as "Range Rover" - never use generic terms like "the vehicle," "the car," or "the SUV."
+
+When providing captions, focus strictly on:
+- Setting, environment, and backgrounds
+- Lighting conditions and effects (including reflections, shadows, specular highlights)
+- Positioning and orientation of the Range Rover
+- For closeups: identify the specific part being shown (headlights of Range Rover, bumper of Range Rover, wheels of Range Rover, etc.)
+- Colors and visual elements that aren't specific to the Range Rover model
+
+Format your responses using markdown code blocks as shown:
 ```
 Your caption text here
 ```
 """
 
-image_prompt = """Describe the visual elements of this image in two to three sentences, focusing strictly on objective details like:
-- Physical objects and subjects
-- Clothing and accessories
-- Poses and positions
-- Settings and environments
-- Colors and lighting
-- Any visible text
+image_prompt = """Describe this Range Rover photograph in 2-3 sentences focusing on:
+- The environmental setting and background elements
+- Lighting conditions, shadows, and reflections on the Range Rover
+- The Range Rover's position, angle, and orientation in the scene
+- For closeups: identify the specific car part shown (e.g., "headlights of Range Rover")
+- Any notable weather conditions or time of day
 
-Do not mention:
-- Artistic style or technique
-- Quality or skill level
-- Emotions or expressions
-- Composition or framing
-- Inferred meanings
+IMPORTANT: Always refer to the vehicle specifically as "Range Rover" - never use generic terms like "the vehicle," "the car," or "the SUV."
 
-Start directly with the description, no preambles like "The image shows" or "This is a picture of."
+DO NOT describe:
+- The body shape, design, or distinctive styling features of the Range Rover
+- Model-specific details or brand characteristics
+- The overall silhouette or proportions of the vehicle
+
+Start directly with the description, no preambles.
 
 Return your response in markdown code blocks:
 ```
