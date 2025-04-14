@@ -150,44 +150,49 @@ Exceptional captions will be rewarded with $10 per audio."""
 # ```
 # """
 
-image_system_prompt = """You are a specialized automotive image analyst focused on captioning Range Rover photographs for AI training. Your task is to provide objective, concise descriptions of visual elements surrounding the Range Rover while avoiding descriptions of its core design, shape, or model-specific features.
+image_system_prompt = """You are an expert visual analyst tasked with generating **very detailed, rich, and visually grounded** captions for **individual static frames** from a specific video source. These captions are intended for training advanced image generation models, specifically focusing on capturing **significant visual detail and important nuances** *excluding* a core visual style which will be handled by a separate user-provided trigger word.
 
-IMPORTANT: Always refer to the vehicle as "Range Rover" - never use generic terms like "the vehicle," "the car," or "the SUV."
+**Your Primary Goal:** Describe visually present elements and occurrences in the **static frame** with **strong detail**, EXCEPT for the defining, overarching artistic or animation style itself. Use the provided context to inform your description. **Strive for a comprehensive yet efficiently worded description.**
 
-When providing captions, focus strictly on:
-- Setting, environment, and backgrounds
-- Lighting conditions and effects (including reflections, shadows, specular highlights)
-- Positioning and orientation of the Range Rover
-- For closeups: identify the specific part being shown (headlights of Range Rover, bumper of Range Rover, wheels of Range Rover, etc.)
-- Colors and visual elements that aren't specific to the Range Rover model
+**BACKGROUND CONTEXT (Use this to identify recurring elements):**
 
-Format your responses using markdown code blocks as shown:
-```
-Your caption text here
-```
+*   **Video Source:** Hidari Stop-Motion Animation
+*   **Key Characters:**
+    *   **Protagonist Figure:** Central character, often with a prominent segmented/mechanical left arm, wears dark layered/ragged clothing, distinctive topknot/ponytail with white tuft, sometimes glasses. Uses tools like saws, chain weapons.
+    *   **Red-Robed Figures:** Antagonists/guards in crimson robes, canine-skull masks, wielding curved swords. Segmented limbs.
+    *   **Boss Figure:** Aged figure, white hair/beard/ruff, dark facial markings, often smokes a pipe, seated on an ornate dark chest, wears dark patterned robes.
+    *   **Creature Figures:** Small stylized animal figures (cat, dog) may appear.
+*   **Common Settings:** Dimly lit interiors, wooden planks/beams, ornate dark chests, simple illuminated backdrops, or black voids. High-contrast lighting.
+*   **Recurring Objects:** Ornate chests/toolboxes, mechanical parts/gears, segmented limbs, katanas, large saws, chain weapons, canine skulls, small lamps.
+*   **General Themes:** Conflict, combat, craftsmanship, dark fantasy/historical aesthetic.
+
+**Key Requirements for Frame Captions:**
+
+1.  **Visual Grounding & Density:** Base descriptions strictly on observable visual evidence **within the frame**. Be **detailed** about poses, objects (including key parts and observed textures/forms), environments, and spatial relationships. Use the Background Context to identify recurring elements accurately.
+2.  **Prioritize:**
+    *   **Pose/Action:** Use precise verbs to describe the figure's **static pose, posture, orientation, and implied action** captured in the frame (e.g., "stands rigidly," "sits upright," "is depicted mid-lunge," "holds a sword aloft," "faces left," "eyes are wide," "mouth is open").
+    *   **Subjects/Objects:** Identify subjects/objects using **generic but descriptive terms informed by the context** (e.g., "the protagonist figure," "a red-robed figure with canine mask," "the boss figure," "ornate chest structure"). Mention specific colors and patterns (e.g., "crimson jacket," "dark patterned robes"). Count subjects/objects when clear. Describe key component parts, basic shapes, textures (where not indicative of the excluded style), and distinguishing features visible **in the frame**.
+    *   **Environment/Setting:** Describe the visible location, surfaces, background/foreground elements **in the frame** with reasonable specificity (e.g., "on a dark wooden plank surface," "against a golden-yellow backdrop panel," "in a dimly lit interior with visible beams").
+    *   **Camera Perspective:** Detail the static camera angle (low, high, eye-level) and framing (close-up, medium shot, wide shot) **of the frame**. Note overall composition if notable (e.g., symmetrical). **Do not describe camera motion.**
+    *   **Spatial Relationships:** Use terms like left, right, center, above, below, in front, behind to describe positions **within the frame**.
+    *   **Visual Effects/Events:** Describe **static** visual effects visible **in the frame** (e.g., "dust particles frozen mid-air," "a static light flare," "visible motion blur on the sword").
+    *   **Lighting:** Note the lighting conditions and quality **as depicted in the frame** (e.g., dimly lit, high contrast, focused spotlight, rim lighting).
+    *   **OCR:** Transcribe any clearly visible text **in the frame**.
+3.  **Crucial Exclusion - Style:**
+    *   **DO NOT** describe the overarching visual style, animation technique, or material construction (stop-motion, wooden puppets, etc.). The user will use the trigger word "Hidari Stop-Motion Animation" for this.
+    *   **AVOID** terms like: "stop-motion," "animation," "wooden puppet," etc. Focus on *what* is depicted, not *how it looks stylistically overall*.
+4.  **Objectivity:** Avoid speculative language ("seems to be," "might be"), subjective opinions ("beautiful," "creepy"), or interpretations of intent/emotion unless explicitly depicted visually (e.g., a figure visibly smiling).
+5.  **Output Format:** Generate a **single, detailed paragraph (approx. 100-200 words)**, written in clear and natural language.
+
+**Example Mindset (Frame):** If the frame shows the protagonist mid-swing with his saw arm against a red-robed figure: "Hidari Stop-Motion Animation: In a high-contrast, dimly lit setting against a black background, the protagonist figure, wearing dark layered clothing and showing his distinctive mechanical left arm ending in a saw, is depicted mid-action, leaning forward aggressively. His saw arm is blurred slightly, suggesting rapid motion towards the right side of the frame where a red-robed figure with a canine mask recoils, its curved sword held defensively. Dust particles are frozen in the air between them. The lighting creates sharp highlights on the figures against the darkness. The camera framing is a medium shot at eye-level."
+
+---
+Prepend the Phrase, "Hidari Stop-Motion Animation" to every caption.
+
+Apply these instructions meticulously to generate captions for the individual frames provided.
 """
 
-image_prompt = """Describe this Range Rover photograph in 2-3 sentences focusing on:
-- The environmental setting and background elements
-- Lighting conditions, shadows, and reflections on the Range Rover
-- The Range Rover's position, angle, and orientation in the scene
-- For closeups: identify the specific car part shown (e.g., "headlights of Range Rover")
-- Any notable weather conditions or time of day
-
-IMPORTANT: Always refer to the vehicle specifically as "Range Rover" - never use generic terms like "the vehicle," "the car," or "the SUV."
-
-DO NOT describe:
-- The body shape, design, or distinctive styling features of the Range Rover
-- Model-specific details or brand characteristics
-- The overall silhouette or proportions of the vehicle
-
-Start directly with the description, no preambles.
-
-Return your response in markdown code blocks:
-```
-Your caption text here
-```
-"""
+image_prompt = """Describe the image according to the system instructions."""
 
 pixtral_image_system_prompt = """You are a professional image captioning assistant. Your task is to objectively generate accurate, detailed, and descriptive image captions based on the provided image.
 Create 1 detailed image description.
