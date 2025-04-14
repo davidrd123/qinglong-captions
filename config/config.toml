@@ -317,7 +317,7 @@ top_k = 64
 max_output_tokens = 8192
 response_mime_type = "text/plain"
 
-[generation_config.gemini-2_0-pro-exp-02-05]
+[generation_config.gemini-2_5-pro-preview-03-25]
 temperature = 1.0
 top_p = 0.95
 top_k = 64

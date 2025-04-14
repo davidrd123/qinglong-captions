@@ -47,704 +47,283 @@ def api_process_batch(
     args,
     sha256hash: str,
 ) -> str:
+    console.print("[magenta]DEBUG: ***** ENTERED api_process_batch *****[/magenta]")
+    try:
+        console.print("[magenta]DEBUG: Accessing initial prompts...[/magenta]")
+        system_prompt = config["prompts"]["system_prompt"]
+        prompt = config["prompts"]["prompt"]
+        console.print("[magenta]DEBUG: Initial prompts accessed.[/magenta]")
 
-    system_prompt = config["prompts"]["system_prompt"]
-    prompt = config["prompts"]["prompt"]
-
-    if mime.startswith("video"):
-        system_prompt = config["prompts"]["video_system_prompt"]
-        prompt = config["prompts"]["video_prompt"]
-    elif mime.startswith("audio"):
-        system_prompt = config["prompts"]["audio_system_prompt"]
-        prompt = config["prompts"]["audio_prompt"]
-    elif mime.startswith("image"):
-        system_prompt = config["prompts"]["image_system_prompt"]
-        prompt = config["prompts"]["image_prompt"]
-
-    if args.step_api_key != "" and mime.startswith("video"):
-
-        system_prompt = config["prompts"]["step_video_system_prompt"]
-        prompt = config["prompts"]["step_video_prompt"]
-
-        client = OpenAI(
-            api_key=args.step_api_key, base_url="https://api.stepfun.com/v1"
-        )
-
-        file = client.files.create(file=open(uri, "rb"), purpose="storage")
-
-        console.print(f"[blue]Uploaded video file:[/blue] {file}")
-
-        for attempt in range(args.max_retries):
-            try:
-                start_time = time.time()
-                completion = client.chat.completions.create(
-                    model=args.step_model_path,
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": system_prompt,
-                        },
-                        {
-                            "role": "user",
-                            "content": [
-                                {
-                                    "type": "video_url",
-                                    "video_url": {"url": "stepfile://" + file.id},
-                                },
-                                {
-                                    "type": "text",
-                                    "text": prompt,
-                                },
-                            ],
-                        },
-                    ],
-                    temperature=0.7,
-                    top_p=0.95,
-                    max_tokens=8192,
-                    stream=True,
-                )
-
-                chunks = []
-                for chunk in completion:
-                    if (
-                        hasattr(chunk.choices[0].delta, "content")
-                        and chunk.choices[0].delta.content is not None
-                    ):
-                        chunks.append(chunk.choices[0].delta.content)
-                        console.print(".", end="", style="blue")
-
-                console.print("\n")
-                response_text = "".join(chunks)
-
-                elapsed_time = time.time() - start_time
-                console.print(
-                    f"[blue]Caption generation took:[/blue] {elapsed_time:.2f} seconds"
-                )
-
-                # Convert HTML font tags to rich format
-                display_text = response_text.replace(
-                    '<font color="green">', "[green]"
-                ).replace("</font>", "[/green]")
-                try:
-                    console.print(display_text)
-                except Exception as e:
-                    console.print(Text(display_text))
-
-                # Extract SRT content between first and second ```
-                text = response_text
-                if text:
-                    # 查找所有的 ``` 标记位置
-                    markers = []
-                    start = 0
-                    while True:
-                        pos = text.find("```", start)
-                        if pos == -1:
-                            break
-                        markers.append(pos)
-                        start = pos + 3
-
-                    # 确保找到至少一对标记
-                    if len(markers) >= 2:
-                        # 获取最后一对标记之间的内容
-                        first_marker = markers[-2]
-                        second_marker = markers[-1]
-                        content = text[first_marker + 3 : second_marker]
-
-                        # Remove "srt" if present at the start
-                        if content.startswith("srt"):
-                            content = content[3:]
-
-                        console.print(
-                            f"[blue]Extracted SRT content length:[/blue] {len(content)}"
-                        )
-                        console.print(f"[blue]Found {len(markers)} ``` markers[/blue]")
-                    else:
-                        console.print(
-                            f"[red]Not enough ``` markers: found {len(markers)}[/red]"
-                        )
-                        content = ""
-                        continue
-                else:
-                    content = ""
-                return content
-            except Exception as e:
-                error_msg = Text(str(e), style="red")
-                console.print(f"[red]Error processing: {error_msg}[/red]")
-                if attempt < args.max_retries - 1:
-                    console.print(
-                        f"[yellow]Retrying in {args.wait_time} seconds...[/yellow]"
-                    )
-                    elapsed_time = time.time() - start_time
-                    if elapsed_time < args.wait_time:
-                        time.sleep(args.wait_time - elapsed_time)
-                else:
-                    console.print(
-                        f"[red]Failed to process after {args.max_retries} attempts. Skipping.[/red]"
-                    )
-                continue
-        return ""
-
-    elif args.qwenVL_api_key != "" and mime.startswith("video"):
-        import dashscope
-
-        system_prompt = config["prompts"]["qwenvl_video_system_prompt"]
-        prompt = config["prompts"]["qwenvl_video_prompt"]
-
-        file = f"file://{Path(uri).resolve().as_posix()}"
-
-        console.print(f"[blue]Uploading video file:[/blue] {file}")
-
-        messages = [
-            {
-                "role": "system",
-                "content": [
-                    {"text": system_prompt},
-                ],
-            },
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "video": file,
-                        # "video": "https://help-static-aliyun-doc.aliyuncs.com/file-manage-files/zh-CN/20241115/cqqkru/1.mp4",
-                    },
-                    {"text": prompt},
-                ],
-            },
-        ]
-
-        for attempt in range(args.max_retries):
-            try:
-                start_time = time.time()
-                responses = dashscope.MultiModalConversation.call(
-                    model=args.qwenVL_model_path,
-                    messages=messages,
-                    api_key=args.qwenVL_api_key,
-                    stream=True,
-                    incremental_output=True,
-                )
-
-                chunks = ""
-                for chunk in responses:
-                    print(chunk)
-                    chunks += chunk.output.choices[0].message.content[0]["text"]
-                    try:
-                        console.print(chunks, end="", overflow="ellipsis")
-                    except Exception as e:
-                        console.print(Text(chunks), end="", overflow="ellipsis")
-                    finally:
-                        console.file.flush()
-                console.print("\n")
-                response_text = chunks
-
-                elapsed_time = time.time() - start_time
-                console.print(
-                    f"[blue]Caption generation took:[/blue] {elapsed_time:.2f} seconds"
-                )
-
-                # Convert HTML font tags to rich format
-                display_text = response_text.replace(
-                    '<font color="green">', "[green]"
-                ).replace("</font>", "[/green]")
-                try:
-                    console.print(display_text)
-                except Exception as e:
-                    console.print(Text(display_text))
-
-                # Extract SRT content between first and second ```
-                text = response_text
-                if text:
-                    # 查找所有的 ``` 标记位置
-                    markers = []
-                    start = 0
-                    while True:
-                        pos = text.find("```", start)
-                        if pos == -1:
-                            break
-                        markers.append(pos)
-                        start = pos + 3
-
-                    # 确保找到至少一对标记
-                    if len(markers) >= 2:
-                        # 获取最后一对标记之间的内容
-                        first_marker = markers[-2]
-                        second_marker = markers[-1]
-                        content = text[first_marker + 3 : second_marker]
-
-                        # Remove "srt" if present at the start
-                        if content.startswith("srt"):
-                            content = content[3:]
-
-                        console.print(
-                            f"[blue]Extracted SRT content length:[/blue] {len(content)}"
-                        )
-                        console.print(f"[blue]Found {len(markers)} ``` markers[/blue]")
-                    else:
-                        console.print(
-                            f"[red]Not enough ``` markers: found {len(markers)}[/red]"
-                        )
-                        content = ""
-                        continue
-                else:
-                    content = ""
-                return content
-            except Exception as e:
-                error_msg = Text(str(e), style="red")
-                console.print(f"[red]Error processing: {error_msg}[/red]")
-                if attempt < args.max_retries - 1:
-                    console.print(
-                        f"[yellow]Retrying in {args.wait_time} seconds...[/yellow]"
-                    )
-                    elapsed_time = time.time() - start_time
-                    if elapsed_time < args.wait_time:
-                        time.sleep(args.wait_time - elapsed_time)
-                else:
-                    console.print(
-                        f"[red]Failed to process after {args.max_retries} attempts. Skipping.[/red]"
-                    )
-                continue
-        return ""
-
-    elif args.pixtral_api_key != "" and mime.startswith("image"):
-
-        system_prompt = config["prompts"]["pixtral_image_system_prompt"]
-        prompt = config["prompts"]["pixtral_image_prompt"]
-
-        base64_image, pixels = encode_image(uri)
-        if base64_image is None or pixels is None:
+        console.print(f"[magenta]DEBUG: Checking mime type: {mime}[/magenta]")
+        if mime.startswith("video"):
+            console.print("[magenta]DEBUG: Mime is video. Accessing video prompts...[/magenta]")
+            system_prompt = config["prompts"]["video_system_prompt"]
+            prompt = config["prompts"]["video_prompt"]
+            console.print("[magenta]DEBUG: Video prompts accessed.[/magenta]")
+        elif mime.startswith("audio"):
+            console.print("[magenta]DEBUG: Mime is audio. Accessing audio prompts...[/magenta]")
+            system_prompt = config["prompts"]["audio_system_prompt"]
+            prompt = config["prompts"]["audio_prompt"]
+            console.print("[magenta]DEBUG: Audio prompts accessed.[/magenta]")
+        elif mime.startswith("image"):
+            console.print("[magenta]DEBUG: Mime is image. Accessing image prompts...[/magenta]")
+            system_prompt = config["prompts"]["image_system_prompt"]
+            prompt = config["prompts"]["image_prompt"]
+            console.print("[magenta]DEBUG: Image prompts accessed.[/magenta]")
+        else:
+            console.print(f"[red]Unsupported mime type for processing: {mime}[/red]")
+            console.print("[magenta]DEBUG: EXITING at unsupported mime type[/magenta]")
             return ""
+        console.print("[magenta]DEBUG: Prompt selection complete.[/magenta]")
 
-        client = Mistral(api_key=args.pixtral_api_key)
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {
-                        "type": "image_url",
-                        "image_url": f"data:image/jpeg;base64,{base64_image}",
-                    },
-                ],
-            },
-        ]
-
-        for attempt in range(args.max_retries):
+        # === KEEP ONLY GEMINI LOGIC ===
+        console.print(f"[magenta]DEBUG: Checking Gemini API key presence (present: {args.gemini_api_key != ''})...[/magenta]")
+        if args.gemini_api_key != "":
+            console.print("[magenta]DEBUG: Entered Gemini block. Getting generation_config...[/magenta]")
             try:
-                start_time = time.time()
-                chat_response = client.chat.complete(
-                    model=args.pixtral_model_path, messages=messages
+                generation_config = (
+                    config["generation_config"].get(args.gemini_model_path.replace(".", "_"), config["generation_config"]["default"])
                 )
-                content = chat_response.choices[0].message.content
-
-                if "502" in content:
-                    console.print(
-                        f"[yellow]Attempt {attempt + 1}/{args.max_retries}: Received 502 error[/yellow]"
-                    )
-                    continue
-
-                # if character_name:
-                #     clean_char_name = (
-                #         character_name.split(",")[0].split(" from ")[0].strip("<>")
-                #     )
-                #     if clean_char_name not in content:
-                #         console.print()
-                #         console.print(Text(content))
-                #         console.print(
-                #             f"Attempt {attempt + 1}/{args.max_retries}: Character name [green]{clean_char_name}[/green] not found"
-                #         )
-                #         continue
-
-                if "###" not in content:
-                    console.print(Text(content))
-                    console.print(Text("No ###, retrying...", style="yellow"))
-                    continue
-
-                short_description, long_description = process_llm_response(content)
-                tag_description = ""
-                # tag_description = (
-                #     prompt.rsplit("<s>[INST]", 1)[-1]
-                #     .rsplit(">.", 1)[-1]
-                #     .rsplit(").", 1)[-1]
-                #     .replace(" from", ",")
-                # )
-                # tag_description = tag_description.rsplit("[IMG][/INST]", 1)[0].strip()
-                short_highlight_rate = 0
-                long_highlight_rate = 0
-                # short_description, short_highlight_rate = format_description(
-                #     short_description, tag_description
-                # )
-                # long_description, long_highlight_rate = format_description(
-                #     long_description, tag_description
-                # )
-
-                console.print()
-                console.print()
-                # 获取图片实际高度
-                panel_height = 32  # 加上面板的边框高度
-
-                # 创建布局
-                layout = Layout()
-
-                # 创建右侧的垂直布局
-                right_layout = Layout()
-
-                # 创建上半部分的水平布局（tag和short并排）
-                top_layout = Layout()
-                top_layout.split_row(
-                    Layout(
-                        Panel(
-                            Text(tag_description, style="magenta"),
-                            title="tags",
-                            height=panel_height // 2,
-                            padding=0,
-                            expand=True,
-                        ),
-                        ratio=1,
-                    ),
-                    Layout(
-                        Panel(
-                            short_description,
-                            title=f"short_description - [yellow]highlight rate:[/yellow] {short_highlight_rate}",
-                            height=panel_height // 2,
-                            padding=0,
-                            expand=True,
-                        ),
-                        ratio=1,
-                    ),
-                )
-
-                # 将右侧布局分为上下两部分
-                right_layout.split_column(
-                    Layout(top_layout, ratio=1),
-                    Layout(
-                        Panel(
-                            long_description,
-                            title=f"long_description - [yellow]highlight rate:[/yellow] {long_highlight_rate}",
-                            height=panel_height // 2,
-                            padding=0,
-                            expand=True,
-                        )
-                    ),
-                )
-
-                # 主布局分为左右两部分
-                layout.split_row(
-                    Layout(
-                        Panel(pixels, height=panel_height, padding=0, expand=True),
-                        name="image",
-                        ratio=1,
-                    ),
-                    Layout(right_layout, name="caption", ratio=2),
-                )
-
-                # 将整个布局放在一个高度受控的面板中
-                console.print(
-                    Panel(
-                        layout,
-                        title=Path(uri).name,
-                        height=panel_height + 2,
-                        padding=0,
-                    )
-                )
-                del pixels
-
-                # 计算已经消耗的时间，动态调整等待时间
-                elapsed_time = time.time() - start_time
-                if elapsed_time < args.wait_time:
-                    time.sleep(args.wait_time - elapsed_time)
-
-                return content
-
-            except Exception as e:
-                error_msg = Text(str(e), style="red")
-                console.print(
-                    f"[red]Attempt {attempt + 1}/{args.max_retries}: Error - ", end=""
-                )
-                console.print(error_msg)
-                if attempt < args.max_retries - 1:
-                    wait_time = args.wait_time
-                    if "429" in str(e):
-                        wait_time = 59
-                        console.print(
-                            f"[yellow]429 error, waiting {wait_time} seconds and retrying...[/yellow]"
-                        )
-                        with Progress() as progress:
-                            task = progress.add_task(
-                                "[magenta]Waiting...", total=wait_time
-                            )
-                            for _ in range(wait_time):
-                                time.sleep(1)
-                                progress.update(task, advance=1)
-                        console.print("[green]Retrying...[/green]")
-                    time.sleep(wait_time)
-                    continue
-        return ""
-
-    elif args.gemini_api_key != "":
-        generation_config = (
-            config["generation_config"][args.gemini_model_path.replace(".", "_")]
-            if config["generation_config"][args.gemini_model_path.replace(".", "_")]
-            else config["generation_config"]["default"]
-        )
-
-        # Check if rate limiting is needed
-        if "rate_limit" in generation_config:
-            rate_wait = generation_config.get("rate_wait", 6)  # default 6 seconds
-            console.print(f"[yellow]Rate limiting: waiting {rate_wait} seconds...[/yellow]")
-            time.sleep(rate_wait)
-
-        genai_config = types.GenerateContentConfig(
-            system_instruction=system_prompt,
-            temperature=generation_config["temperature"],
-            top_p=generation_config["top_p"],
-            top_k=generation_config["top_k"],
-            candidate_count=config["generation_config"]["candidate_count"],
-            max_output_tokens=generation_config["max_output_tokens"],
-            presence_penalty=0.0,
-            frequency_penalty=0.0,
-            # tools=(
-            #     [types.Tool(google_search_retrieval=types.GoogleSearchRetrieval())]
-            #     if mime.startswith("image") or mime.startswith("audio")
-            #     else None
-            # ),
-            # tool_config=(
-            #     types.ToolConfig(
-            #         function_calling_config=types.FunctionCallingConfig(
-            #             mode="AUTO", allowed_function_names=["google_search_retrieval"]
-            #         )
-            #     )
-            #     if mime.startswith("image") or mime.startswith("audio")
-            #     else None
-            # ),
-            safety_settings=[
-                types.SafetySetting(
-                    category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-                    threshold=types.HarmBlockThreshold.BLOCK_NONE,
-                ),
-                types.SafetySetting(
-                    category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-                    threshold=types.HarmBlockThreshold.BLOCK_NONE,
-                ),
-            ],
-            response_mime_type=generation_config["response_mime_type"],
-        )
-
-        console.print(f"generation_config: {generation_config}")
-
-        client = genai.Client(api_key=args.gemini_api_key)
-
-        if (
-            mime.startswith("video")
-            or mime.startswith("audio")
-            and Path(uri).stat().st_size >= 20 * 1024 * 1024
-        ):
-            upload_success = False
-            files = []
-            file = types.File()
-
-            for upload_attempt in range(args.max_retries):
-                try:
-                    console.print()
-                    console.print(f"[blue]checking files for:[/blue] {uri}")
-                    try:
-                        file = client.files.get(
-                            name=sanitize_filename_for_gemini(Path(uri).name)
-                        )
-
-                        console.print(file)
-                        if file.state.name == "ACTIVE" and (
-                            base64.b64decode(file.sha256_hash).decode("utf-8")
-                            == sha256hash
-                            or file.size_bytes == Path(uri).stat().st_size
-                        ):
-                            console.print()
-                            console.print(
-                                f"[green]File {file.name} is already active at {file.uri}[/green]"
-                            )
-                            files = [file]
-                            upload_success = True
-                            break
-                        else:
-                            console.print()
-                            console.print(
-                                f"[yellow]File {file.name} is already exist but {base64.b64decode(file.sha256_hash).decode('utf-8')} not have same sha256hash {sha256hash}[/yellow]"
-                            )
-                            client.files.delete(
-                                name=sanitize_filename_for_gemini(Path(uri).name)
-                            )
-                            raise Exception("Delete same name file and retry")
-
-                    except Exception as e:
-                        console.print()
-                        console.print(
-                            f"[yellow]File {file.name} is not active[/yellow]"
-                        )
-                        console.print(f"[blue]uploading files for:[/blue] {uri}")
-                        files = [upload_to_gemini(client, uri, mime_type=mime)]
-                        wait_for_files_active(client, files)
-                        upload_success = True
-                        break
-
-                except Exception as e:
-                    console.print(
-                        f"[yellow]Upload attempt {upload_attempt + 1}/{args.max_retries} failed: {e}[/yellow]"
-                    )
-                    if upload_attempt < args.max_retries - 1:
-                        time.sleep(
-                            args.wait_time * 2
-                        )  # Increase wait time between retries
-                    else:
-                        console.print("[red]All upload attempts failed[/red]")
-                        return ""
-
-            if not upload_success:
-                console.print("[red]Failed to upload file[/red]")
+                console.print("[magenta]DEBUG: generation_config retrieved.[/magenta]")
+            except KeyError as e:
+                console.print(f"[red]Error accessing generation config: {e}. Check config.toml.[/red]")
+                console.print("[magenta]DEBUG: EXITING at generation config KeyError[/magenta]")
                 return ""
 
-        # Some files have a processing delay. Wait for them to be ready.
-        # wait_for_files_active(files)
-        for attempt in range(args.max_retries):
+            console.print("[magenta]DEBUG: Checking for rate limit...[/magenta]")
+            if "rate_limit" in generation_config:
+                rate_wait = generation_config.get("rate_wait", 6)
+                console.print(f"[yellow]Rate limiting: waiting {rate_wait} seconds...[/yellow]")
+                time.sleep(rate_wait)
+                console.print("[magenta]DEBUG: Rate limit wait finished.[/magenta]")
+            else:
+                console.print("[magenta]DEBUG: No rate limit configured.[/magenta]")
+
+            console.print("[magenta]DEBUG: Setting up genai_config...[/magenta]")
             try:
-                console.print(f"[blue]Generating captions...[/blue]")
-                start_time = time.time()
-
-                if mime.startswith("video") or (
-                    mime.startswith("audio")
-                    and Path(uri).stat().st_size >= 20 * 1024 * 1024
-                ):
-                    response = client.models.generate_content_stream(
-                        model=args.gemini_model_path,
-                        contents=[
-                            types.Part.from_uri(file_uri=files[0].uri, mime_type=mime),
-                            types.Part.from_text(text=prompt),
-                        ],
-                        config=genai_config,
-                    )
-                elif mime.startswith("audio"):
-                    audio_blob = Path(uri).read_bytes()
-                    response = client.models.generate_content_stream(
-                        model=args.gemini_model_path,
-                        contents=[
-                            types.Part.from_bytes(data=audio_blob, mime_type=mime),
-                            types.Part.from_text(text=prompt),
-                        ],
-                        config=genai_config,
-                    )
-                else:
-                    blob, pixels = encode_image(uri)
-                    response = client.models.generate_content_stream(
-                        model=args.gemini_model_path,
-                        contents=[
-                            types.Part.from_text(text=prompt),
-                            types.Part.from_bytes(data=blob, mime_type="image/jpeg"),
-                        ],
-                        config=genai_config,
-                    )
-
-                # 收集流式响应
-                chunks = []
-                for chunk in response:
-                    if chunk.text:
-                        chunks.append(chunk.text)
-                        console.print("")
-                        try:
-                            console.print(chunk.text, end="" , overflow="ellipsis")
-                        except Exception as e:
-                            console.print(Text(chunk.text), end="" , overflow="ellipsis")
-                        finally:
-                            console.file.flush()
-
-                console.print("\n")
-                response_text = "".join(chunks)
-
-                elapsed_time = time.time() - start_time
-                log_api_call(args.gemini_model_path, "success", elapsed_time)
-                
-                 # Rate limit wait if configured
-                if "rate_limit" in generation_config:
-                    rate_wait = generation_config.get("rate_wait", 6)
-                    remaining = rate_wait - elapsed_time
-                    if remaining > 0:
-                        console.print(f"[yellow]Waiting {remaining:.1f}s...[/yellow]")
-                        time.sleep(remaining)
-                
-                console.print(
-                    f"[blue]Caption generation took:[/blue] {elapsed_time:.2f} seconds"
+                genai_config = types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                    temperature=generation_config.get("temperature", 1.0),
+                    top_p=generation_config.get("top_p", 0.95),
+                    top_k=generation_config.get("top_k", 64),
+                    candidate_count=config.get("generation_config", {}).get("candidate_count", 1),
+                    max_output_tokens=generation_config.get("max_output_tokens", 8192),
+                    presence_penalty=0.0,
+                    frequency_penalty=0.0,
+                    safety_settings=[
+                        types.SafetySetting(
+                            category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                            threshold=types.HarmBlockThreshold.BLOCK_NONE,
+                        ),
+                        types.SafetySetting(
+                            category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                            threshold=types.HarmBlockThreshold.BLOCK_NONE,
+                        ),
+                    ],
+                    response_mime_type=generation_config.get("response_mime_type", "text/plain"),
                 )
+                console.print("[magenta]DEBUG: genai_config setup complete.[/magenta]")
+            except Exception as config_err:
+                 console.print(f"[red]Error setting up Gemini generation config: {config_err}[/red]")
+                 console.print("[magenta]DEBUG: EXITING at genai_config setup Exception[/magenta]")
+                 return ""
 
-                # Convert HTML font tags to rich format
-                display_text = response_text.replace(
-                    '<font color="green">', "[green]"
-                ).replace("</font>", "[/green]")
+            console.print(f"Using generation_config: {generation_config}")
+
+            console.print("[magenta]DEBUG: Initializing genai.Client...[/magenta]")
+            try:
+                client = genai.Client(api_key=args.gemini_api_key)
+                console.print("[magenta]DEBUG: genai.Client initialized.[/magenta]")
+            except Exception as client_err:
+                console.print(f"[red]Error initializing Gemini client: {client_err}[/red]")
+                console.print("[magenta]DEBUG: EXITING at genai.Client initialization Exception[/magenta]")
+                return ""
+
+            # --- Handle File Upload for Large Media ---
+            console.print("[cyan]DEBUG: Checking if upload is required...[/cyan]")
+            upload_required = (
+                mime.startswith("video")
+                or mime.startswith("audio")
+                and Path(uri).stat().st_size >= 20 * 1024 * 1024
+            )
+            console.print("[cyan]DEBUG: Finished upload block (or skipped). Proceeding to API call attempts.[/cyan]")
+            files = []
+            if upload_required:
+                console.print(f"[cyan]DEBUG: Checking files for:[/cyan] {uri}")
                 try:
-                    console.print(display_text)
-                except Exception as e:
-                    console.print(Text(display_text))
+                    file = client.files.get(
+                        name=sanitize_filename_for_gemini(Path(uri).name)
+                    )
 
-                # Extract SRT content between first and second ```
-                text = response_text
-                if text:
-                    # 查找所有的 ``` 标记位置
-                    markers = []
-                    start = 0
-                    while True:
-                        pos = text.find("```", start)
-                        if pos == -1:
-                            break
-                        markers.append(pos)
-                        start = pos + 3
-
-                    # 确保找到至少一对标记
-                    if len(markers) >= 2:
-                        # 获取最后一对标记之间的内容
-                        first_marker = markers[-2]
-                        second_marker = markers[-1]
-                        content = text[first_marker + 3 : second_marker]
-
-                        # Remove "srt" if present at the start
-                        if content.startswith("srt"):
-                            content = content[3:]
-
+                    console.print(file)
+                    if file.state.name == "ACTIVE" and (
+                        base64.b64decode(file.sha256_hash).decode("utf-8")
+                        == sha256hash
+                        or file.size_bytes == Path(uri).stat().st_size
+                    ):
+                        console.print()
                         console.print(
-                            f"[blue]Extracted SRT content length:[/blue] {len(content)}"
+                            f"[green]File {file.name} is already active at {file.uri}[/green]"
                         )
-                        console.print(f"[blue]Found {len(markers)} ``` markers[/blue]")
+                        files = [file]
+                        console.print("[cyan]DEBUG: Files found and uploaded. Proceeding to API call.[/cyan]")
                     else:
+                        console.print()
                         console.print(
-                            f"[red]Not enough ``` markers: found {len(markers)}[/red]"
+                            f"[yellow]File {file.name} is already exist but {base64.b64decode(file.sha256_hash).decode('utf-8')} not have same sha256hash {sha256hash}[/yellow]"
                         )
-                        content = ""
-                        continue
-                else:
-                    content = ""
+                        client.files.delete(
+                            name=sanitize_filename_for_gemini(Path(uri).name)
+                        )
+                        raise Exception("Delete same name file and retry")
 
-                return content
-            except Exception as e:
-                elapsed_time = time.time() - start_time
-                log_api_call(args.gemini_model_path, "error", elapsed_time, str(e))
-                error_msg = Text(str(e), style="red")
-                console.print(f"[red]Error processing: {error_msg}[/red]")
-                if attempt < args.max_retries - 1:
-                    console.print(
-                        f"[yellow]Retrying in {args.wait_time} seconds...[/yellow]"
+                except Exception as e:
+                    console.print(f"[yellow]Failed to get/check file status for {uri}: {e}[/yellow]")
+                    console.print(f"[blue]Proceeding to upload file:[/blue] {uri}")
+                    files = [upload_to_gemini(client, uri, mime_type=mime)]
+                    wait_for_files_active(client, files)
+                    console.print("[cyan]DEBUG: Files uploaded. Proceeding to API call.[/cyan]")
+
+            # Some files have a processing delay. Wait for them to be ready.
+            # wait_for_files_active(files)
+            for attempt in range(args.max_retries):
+                try:
+                    console.print(f"[blue]Generating captions (Attempt {attempt + 1}/{args.max_retries})...[/blue]")
+                    start_time = time.time()
+
+                    # --- Construct API Request Contents ---
+                    console.print(f"[cyan]DEBUG: Preparing contents for {uri}...[/cyan]")
+                    contents_list = [types.Part.from_text(text=prompt)]
+
+                    # === UNDO TEMP DIAGNOSTIC: Restore original logic START ===
+                    if upload_required:
+                        if not files: 
+                            console.print("[red]ERROR: 'files' list is empty but upload was required.[/red]")
+                            raise ValueError("Programming error: Uploaded file reference is missing.")
+                        console.print(f"[cyan]DEBUG: Using uploaded file URI: {files[0].uri}[/cyan]")
+                        contents_list.insert(0, types.Part.from_uri(file_uri=files[0].uri, mime_type=mime))
+                    elif mime.startswith("audio"):
+                        console.print("[cyan]DEBUG: Reading small audio file as bytes...[/cyan]")
+                        audio_blob = Path(uri).read_bytes()
+                        contents_list.insert(0, types.Part.from_bytes(data=audio_blob, mime_type=mime))
+                        console.print(f"[cyan]DEBUG: Added audio blob (size: {len(audio_blob)})[/cyan]")
+                    elif mime.startswith("image"):
+                        console.print("[cyan]DEBUG: Encoding image file as bytes...[/cyan]")
+                        blob, pixels = encode_image(uri) 
+                        if blob is None:
+                            console.print(f"[red]Failed to encode image {uri}. Skipping.[/red]")
+                            log_api_call(args.gemini_model_path, "error", time.time() - start_time, "Image encoding failed")
+                            return "" 
+                        contents_list.insert(0, types.Part.from_bytes(data=blob, mime_type="image/jpeg")) 
+                        console.print(f"[cyan]DEBUG: Added image blob (size: {len(blob)})[/cyan]")
+                    else:
+                        raise ValueError(f"Unsupported mime type for Gemini processing: {mime}")
+                    # === UNDO TEMP DIAGNOSTIC: Restore original logic END ===
+                    
+                    # === REMOVE TEMP DIAGNOSTIC: Forced byte sending START ===
+                    # console.print(f"[yellow]DIAGNOSTIC: Attempting to send {mime} as raw bytes...[/yellow]")
+                    # try:
+                    #     media_blob = Path(uri).read_bytes()
+                    #     contents_list.insert(0, types.Part.from_bytes(data=media_blob, mime_type=mime))
+                    #     console.print(f"[cyan]DEBUG: Added media blob (size: {len(media_blob)})[/cyan]")
+                    # except Exception as read_err:
+                    #     console.print(f"[red]DIAGNOSTIC: Failed to read file bytes for {uri}: {read_err}[/red]")
+                    #     return "" 
+                    # === REMOVE TEMP DIAGNOSTIC: Forced byte sending END ===
+
+                    # --- Make the API Call ---
+                    console.print(f"[cyan]DEBUG: Calling generate_content_stream with model {args.gemini_model_path}[/cyan]")
+                    console.print(f"[cyan]DEBUG: Contents list length: {len(contents_list)}[/cyan]")
+                    response = client.models.generate_content_stream(
+                        model=args.gemini_model_path,
+                        contents=contents_list,
+                        config=genai_config,
                     )
+                    console.print(f"[cyan]DEBUG: generate_content_stream call returned. Response object: {type(response)}[/cyan]")
+
+                    # --- Process Streaming Response ---
+                    chunks = []
+                    console.print("[blue]API Response stream:[/blue]")
+                    chunk_received = False # Flag to check if we get any chunks
+                    for chunk in response:
+                        chunk_received = True # Mark that we received at least one chunk item
+                        # TODO: Add handling for potential non-text chunks or errors within the stream if the API supports it
+                        if chunk.text:
+                            chunks.append(chunk.text)
+                            # Print chunk immediately for feedback
+                            try:
+                                console.print(chunk.text, end="", overflow="ellipsis", highlight=False)
+                            except Exception:
+                                print(chunk.text, end="")
+                            finally:
+                                console.file.flush()
+                        else:
+                            # Log if a chunk doesn't contain text
+                            console.print("[yellow]DEBUG: Received non-text chunk part.[/yellow]")
+
+                    if not chunk_received:
+                        # Log if the loop finishes without processing any chunks (empty stream?)
+                        console.print("[yellow]DEBUG: No chunks received from the response stream.[/yellow]")
+
+                    console.print("\n[green]...stream finished.[/green]") # Indicate end of stream
+                    response_text = "".join(chunks).strip() # Combine and strip whitespace
+
+                    # ... (rest of the success path: logging, timing, content assignment) ...
                     elapsed_time = time.time() - start_time
-                    if elapsed_time < args.wait_time:
-                        time.sleep(args.wait_time - elapsed_time)
-                else:
-                    console.print(
-                        f"[red]Failed to process after {args.max_retries} attempts. Skipping.[/red]"
-                    )
-                continue
-        return ""
+                    log_api_call(args.gemini_model_path, "success", elapsed_time) # Log success
+
+                    console.print(f"[blue]Caption generation took:[/blue] {elapsed_time:.2f} seconds")
+                    content = response_text
+                    if not content:
+                         console.print("[yellow]Warning: API returned empty content after processing stream.[/yellow]")
+                    return content
+
+                # --- Handle Errors During API Call Attempt ---
+                except Exception as e:
+                    elapsed_time = time.time() - start_time
+                    # Log the exception type as well
+                    log_api_call(args.gemini_model_path, "error", elapsed_time, f"{type(e).__name__}: {e}")
+                    error_msg = Text(str(e), style="red")
+                    # Include traceback for more detailed debugging
+                    console.print(f"[red]Error during API call attempt {attempt + 1}/{args.max_retries}: {error_msg}[/red]")
+                    console.print_exception(show_locals=True) # Print traceback
+
+                    # ... (rest of error handling: retry logic) ...
+                    if attempt < args.max_retries - 1:
+                        retry_wait_time = args.wait_time
+                        if "429" in str(e) or "resource_exhausted" in str(e).lower() or "rate limit" in str(e).lower():
+                             retry_wait_time = max(args.wait_time, 15)
+                             console.print(f"[yellow]Rate limit/exhaustion error detected, increasing retry wait to {retry_wait_time}s[/yellow]")
+                        time_spent_in_attempt = time.time() - start_time
+                        actual_wait = retry_wait_time - time_spent_in_attempt
+                        if actual_wait > 0:
+                             console.print(f"[yellow]Retrying in {actual_wait:.1f} seconds...[/yellow]")
+                             time.sleep(actual_wait)
+                        else:
+                             console.print("[yellow]Attempt finished quickly after error, retrying immediately...[/yellow]")
+                        continue
+                    else:
+                        console.print(f"[red]Failed to process after {args.max_retries} attempts. Skipping file {uri}.[/red]")
+                        return ""
+            return ""
+
+        else:
+            console.print("[red]Error: Gemini API key not provided.[/red]")
+            console.print("[magenta]DEBUG: EXITING because no Gemini key[/magenta]")
+            return ""
+            
+    except Exception as outer_e:
+        # Add a top-level exception handler just in case
+        console.print("[bold red]***** UNCAUGHT EXCEPTION IN api_process_batch *****[/bold red]")
+        console.print_exception(show_locals=True)
+        return "" # Return empty on unexpected errors too
 
 
 def sanitize_filename_for_gemini(name: str) -> str:
     """Sanitizes filenames for Gemini API."""
     sanitized = re.sub(r"[^a-z0-9-]", "-", name.lower())
     sanitized = re.sub(r"-+", "-", sanitized).strip("-")
-    return sanitized[-40:] if len(sanitized) > 40 else sanitized
+    return sanitized[:40] if len(sanitized) > 40 else sanitized
 
 
 def upload_to_gemini(client, path, mime_type=None):

@@ -139,6 +139,14 @@ def process_batch(args, config):
                         )
                         uri = files[i]
 
+                        console.print(
+                            f"[green]API processing complete for chunk {i+1}[/green]"
+                        )
+
+                        console.print(
+                            f"[yellow]Post-processing chunk output...[/yellow]"
+                        )
+                        console.print(f"[cyan]DEBUG: Calling api_process_batch for chunk {uri}...[/cyan]")
                         chunk_output = api_process_batch(
                             uri=uri,
                             mime=mime,
@@ -146,6 +154,7 @@ def process_batch(args, config):
                             args=args,
                             sha256hash=sha256hash,
                         )
+                        console.print(f"[cyan]DEBUG: api_process_batch returned for chunk {uri}: '{chunk_output if chunk_output else '<empty string>'}'[/cyan]")
 
                         console.print(
                             f"[green]API processing complete for chunk {i+1}[/green]"
@@ -208,46 +217,23 @@ def process_batch(args, config):
                 processed_filepaths.append(filepath)
 
                 filepath_path = Path(filepath)
-                caption_path = (
-                    filepath_path.with_suffix(".srt")
-                    if filepath_path.suffix in BASE_VIDEO_EXTENSIONS
-                    or filepath_path.suffix in BASE_AUDIO_EXTENSIONS
-                    else filepath_path.with_suffix(".txt")
-                )
+                caption_path = filepath_path.with_suffix(".txt")
+                
                 console.print(f"[blue]Processing caption for:[/blue] {filepath_path}")
                 console.print(f"[blue]Caption content length:[/blue] {len(output)}")
 
-                if caption_path.suffix == ".srt":
-                    try:
-                        subs = pysrt.from_string(output)
-                        subs.save(str(caption_path), encoding="utf-8")
-                        console.print(
-                            f"[green]Saved captions to {caption_path}[/green]"
-                        )
-                    except Exception as e:
-                        console.print(
-                            f"[yellow]pysrt validation failed: {e}, falling back to direct file write[/yellow]"
-                        )
-                        try:
-                            caption_path.write_text(output, encoding="utf-8")
-                            console.print(
-                                f"[green]Saved captions to {caption_path}[/green]"
-                            )
-                        except Exception as e:
-                            console.print(f"[red]Error saving SRT file: {e}[/red]")
-                else:
-                    try:
-                        if isinstance(output, list):
-                            with open(caption_path, "w", encoding="utf-8") as f:
-                                for line in output:
-                                    f.write(line + "\n")
-                        else:
-                            caption_path.write_text(output, encoding="utf-8")
-                        console.print(
-                            f"[green]Saved captions to {caption_path}[/green]"
-                        )
-                    except Exception as e:
-                        console.print(f"[red]Error saving TXT file: {e}[/red]")
+                try:
+                    if isinstance(output, list):
+                        with open(caption_path, "w", encoding="utf-8") as f:
+                            for line in output:
+                                f.write(line + "\n")
+                    else:
+                        caption_path.write_text(output, encoding="utf-8")
+                    console.print(
+                        f"[green]Saved captions to {caption_path}[/green]"
+                    )
+                except Exception as e:
+                    console.print(f"[red]Error saving TXT file: {e}[/red]")
 
             progress.update(task, advance=len(batch))
 

@@ -17,7 +17,7 @@ else
 fi
 
 # Configuration variables
-dataset_path="./datasets/hidari_24fps"  # Default path
+dataset_path="./datasets/hidari_ben_clips"  # Default path
 if [ $# -gt 0 ]; then
     dataset_path="$1"  # Override with command-line argument if provided
     echo "Using provided dataset path: $dataset_path"
@@ -43,7 +43,7 @@ if [ ! -d "$dataset_path" ]; then
 fi
 
 # Configuration variables
-gemini_model_path="gemini-2.0-pro-exp-02-05"
+gemini_model_path="gemini-2.5-pro-preview-03-25"
 # gemini_model_path="gemini-2.0-flash"
 pixtral_model_path="pixtral-large-2411"
 step_model_path="step-1.5v-mini"
